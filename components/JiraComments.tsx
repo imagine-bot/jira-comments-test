@@ -1,21 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import JiraApi from 'jira-client';
-
-// Initialize Jira client
-let jira = new JiraApi({
-  protocol: 'https',
-  host: 'your-jira-instance.atlassian.net',
-  username: 'username',
-  password: 'password',
-  apiVersion: '2',
-  strictSSL: true
-});
 
 interface JiraCommentsProps {
   issueKey: string;
 }
 
-// Define a type for the comments
 interface Comment {
   body: string;
   author: {
@@ -25,7 +13,7 @@ interface Comment {
 
 const JiraComments: React.FC<JiraCommentsProps> = ({ issueKey }) => {
   const [comments, setComments] = useState<Comment[]>([]);
-  const [error, setError] = useState<Error | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     fetchComments();
@@ -33,26 +21,52 @@ const JiraComments: React.FC<JiraCommentsProps> = ({ issueKey }) => {
 
   const fetchComments = async () => {
     try {
-      const issue = await jira.findIssue(issueKey);
-      setComments(issue.fields.comment.comments || []);
+      const res = await fetch('/api/jira', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ issueKey }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setComments(data);
+      } else {
+        setError(data.error);
+      }
     } catch (err) {
-      setError(err as Error);
+      if (err instanceof Error) {
+        setError(err.message);
+      }
     }
   };
 
   const addComment = async () => {
     try {
-      const comment = await jira.addComment(issueKey, 'New comment');
-      setComments([...comments, comment]);
+      const res = await fetch('/api/jira', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ issueKey, comment: 'New comment' }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setComments([...comments, data]);
+      } else {
+        setError(data.error);
+      }
     } catch (err) {
-      setError(err as Error);
+      if (err instanceof Error) {
+        setError(err.message);
+      }
     }
   };
 
   return (
     <div className="p-4 rounded shadow bg-white">
       <h2 className="text-xl font-bold mb-2">Comments</h2>
-      {error && <div className="text-red-500">{error.message}</div>}
+      {error && <div className="text-red-500">{error}</div>}
       {comments.length === 0 ? (
         <p>No comments yet.</p>
       ) : (
